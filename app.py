@@ -1,75 +1,147 @@
 import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import datetime
+import random
+import os
 
-st.set_page_config(page_title="Fitness & Diet Planner", layout="wide")
+# --- КОНФИГУРАЦИЯ ---
+st.set_page_config(page_title="90-Day Fitness Challenge", layout="wide")
 
-# --- СТРАНИЧНА ЛЕНТА: ДАННИ ---
-st.sidebar.header("📋 Твоите параметри")
-weight = st.sidebar.number_input("Тегло (кг):", 40.0, 200.0, 75.0)
-height = st.sidebar.number_input("Ръст (см):", 120, 230, 175)
-age = st.sidebar.number_input("Години:", 15, 90, 25)
-gender = st.sidebar.radio("Пол:", ["Мъж", "Жена"])
-activity = st.sidebar.selectbox("Активност:", ["Ниска", "Умерена", "Висока"])
-goal = st.sidebar.selectbox("Цел:", ["Отслабване", "Поддържане", "Маса"])
-training_pref = st.sidebar.radio("Тип тренировки:", ["Фитнес", "Калистеника"])
+# Файл за база данни
+DB_FILE = "workout_log.csv"
+
+# Мотивационни цитати
+QUOTES = [
+    "„Тялото постига това, в което вярва умът.“",
+    "„Дисциплината е да правиш това, което трябва, дори когато не искаш.“",
+    "„Твоят единствен лимит си ти самият.“",
+    "„Не спирай, когато си уморен. Спри, когато си готов.“",
+    "„Успехът започва извън зоната ти на комфорт.“"
+]
+
+# --- ФУНКЦИИ ЗА ДАННИ ---
+def load_data():
+    if os.path.exists(DB_FILE):
+        df = pd.read_csv(DB_FILE)
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        return df
+    return pd.DataFrame(columns=["Date", "Weight", "Workout_Type", "Duration", "Calories", "Protein", "Water"])
+
+def save_data(df):
+    df.to_csv(DB_FILE, index=False)
 
 # --- ИЗЧИСЛЕНИЯ ---
-# BMR (Mifflin-St Jeor)
-if gender == "Мъж":
-    bmr = 10 * weight + 6.25 * height - 5 * age + 5
-else:
-    bmr = 10 * weight + 6.25 * height - 5 * age - 161
+def calculate_bmr(weight, height, age, gender):
+    # Формула на Mifflin-St Jeor
+    if gender == "Мъж":
+        return 10 * weight + 6.25 * height - 5 * age + 5
+    else:
+        return 10 * weight + 6.25 * height - 5 * age - 161
 
-# TDEE
-act_mult = {"Ниска": 1.2, "Умерена": 1.55, "Висока": 1.75}
-tdee = bmr * act_mult[activity]
+# --- ДИЗАЙН И СТРУКТУРА ---
+st.title("🏆 90-дневно Фитнес Предизвикателство")
+st.info(random.choice(QUOTES))
 
-# Target Calories
-if goal == "Отслабване":
-    target_cal = tdee - 500
-elif goal == "Маса":
-    target_cal = tdee + 400
-else:
-    target_cal = tdee
+# Зареждане на текущи данни
+if 'data' not in st.session_state:
+    st.session_state.data = load_data()
 
-# --- ГЛАВНО ТАБЛО ---
-st.title("💪 Персонален План")
+# --- SIDEBAR: ПРОФИЛ ---
+with st.sidebar:
+    st.header("👤 Потребителски профил")
+    age = st.number_input("Години", 14, 100, 25)
+    gender = st.radio("Пол", ["Мъж", "Жена"])
+    weight_now = st.number_input("Текущо тегло (кг)", 40.0, 200.0, 75.0)
+    height = st.number_input("Ръст (см)", 100, 250, 175)
+    
+    bmr = calculate_bmr(weight_now, height, age, gender)
+    tdee = bmr * 1.2 # Базово ниво на активност
+    
+    st.divider()
+    st.metric("BMR (Основна обмяна)", f"{int(bmr)} kcal")
+    st.metric("Дневен калориен нужд", f"{int(tdee)} kcal")
 
+# --- ГОРЕН ПАНЕЛ: МЕТРИКИ ---
 col1, col2, col3 = st.columns(3)
-col1.metric("BMR (Базов метаболизъм)", f"{int(bmr)} kcal")
-col2.metric("TDEE (Разход)", f"{int(tdee)} kcal")
-col3.metric("Целеви калории", f"{int(target_cal)} kcal", delta=int(target_cal - tdee))
+total_days = len(st.session_state.data['Date'].unique())
+remaining_days = max(0, 90 - total_days)
+total_cals = st.session_state.data['Calories'].sum()
+
+col1.metric("Текущо тегло", f"{weight_now} кг")
+col2.metric("Оставащи дни", f"{remaining_days} / 90")
+col3.metric("Изгорени калории (Общо)", f"{int(total_cals)} kcal")
 
 st.divider()
 
-# --- ДИЕТА ---
-st.header("🥗 Диетичен план")
-p = (target_cal * 0.3) / 4
-c = (target_cal * 0.45) / 4
-f = (target_cal * 0.25) / 9
+# --- МОДУЛИ: ДНЕВЕН ЛОГ ---
+tab1, tab2, tab3 = st.tabs(["📝 Дневен Лог", "📈 Прогрес", "🔥 Heatmap"])
 
-st.write(f"За постигане на целта (**{goal}**), се стреми към следните макроси:")
-st.table({
-    "Протеини (г)": [int(p)],
-    "Въглехидрати (г)": [int(c)],
-    "Мазнини (г)": [int(f)]
-})
+with tab1:
+    with st.form("log_form"):
+        date_col, type_col = st.columns(2)
+        log_date = date_col.date_input("Дата", datetime.date.today())
+        workout_type = type_col.selectbox("Тип тренировка", ["Почивка", "Силова", "Кардио", "Йога"])
+        
+        dur_col, cal_col = st.columns(2)
+        duration = dur_col.number_input("Продължителност (мин)", 0, 300, 45)
+        calories = cal_col.number_input("Изгорени калории", 0, 2000, 300)
+        
+        weight_log = st.number_input("Тегло днес (кг)", 40.0, 200.0, weight_now)
+        
+        p_col, w_col = st.columns(2)
+        protein = p_col.checkbox("Приет достатъчно протеин?")
+        water = w_col.number_input("Вода (литри)", 0.0, 10.0, 2.0)
+        
+        submit = st.form_submit_button("Запази записа")
+        
+        if submit:
+            new_entry = {
+                "Date": log_date, "Weight": weight_log, "Workout_Type": workout_type,
+                "Duration": duration, "Calories": calories, "Protein": protein, "Water": water
+            }
+            # Обновяване на данните (премахване на дубликат за същата дата)
+            df = st.session_state.data
+            df = df[df['Date'] != log_date]
+            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+            st.session_state.data = df
+            save_data(df)
+            st.success("Данните са запазени!")
 
-# --- ТРЕНИРОВКА ---
-st.header(f"🏋️ Тренировъчен режим: {training_pref}")
+# --- МОДУЛИ: ТРАКЕР НА ТЕГЛОТО ---
+with tab2:
+    if not st.session_state.data.empty:
+        df_sorted = st.session_state.data.sort_values("Date")
+        fig = px.line(df_sorted, x="Date", y="Weight", title="Промяна в теглото",
+                      markers=True, line_shape="spline", color_discrete_sequence=['#FF4B4B'])
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.write("Няма въведени данни за визуализация.")
 
-if training_pref == "Фитнес":
-    st.markdown("""
-    - **Ден 1:** Гърди, Рамене, Трицепс (Бутащи)
-    - **Ден 2:** Гръб, Бицепс (Дърпащи)
-    - **Ден 3:** Крака и Корем
-    - *Почивка и повторение*
-    """)
-else:
-    st.markdown("""
-    - **Ден 1:** Набирания, Кофички, Лицеви опори
-    - **Ден 2:** Клякания, Напади, Повдигане на крака (корем)
-    - **Ден 3:** Стойка на ръце, Планкове, Експлозивни движения
-    - *Почивка и повторение*
-    """)
+# --- МОДУЛИ: HEATMAP ПРОГРЕС ---
+with tab3:
+    st.subheader("Визуален прогрес (90 дни)")
+    
+    # Генериране на 90-дневна мрежа
+    grid_data = []
+    types_map = {"Почивка": 0, "Йога": 1, "Кардио": 2, "Силова": 3}
+    
+    # Попълване на масива за 10 реда х 9 колони
+    for i in range(90):
+        # Тук симулираме проверка дали има тренировка за ден i от началото
+        # В реално приложение ще се сравнява с датата на стартиране
+        grid_data.append(random.randint(0, 3)) # Демонстрационни данни
+        
+    heatmap_array = np.array(grid_data).reshape(9, 10)
+    fig_heat = px.imshow(heatmap_array,
+                        labels=dict(color="Интензивност"),
+                        x=[f"Ден {i+1}" for i in range(10)],
+                        y=[f"Седм {i+1}" for i in range(9)],
+                        color_continuous_scale="Viridis")
+    st.plotly_chart(fig_heat, use_container_width=True)
+    st.caption("0: Почивка | 1: Йога | 2: Кардио | 3: Силова")
 
-st.info("Забележка: Данните са изчислени по стандартни формули. Слушай тялото си!")
+# --- ИСТОРИЯ ---
+st.subheader("📜 История на тренировките")
+st.dataframe(st.session_state.data.sort_values("Date", ascending=False), use_container_width=True)
