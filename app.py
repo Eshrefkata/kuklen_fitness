@@ -4,7 +4,7 @@ from PIL import Image
 import datetime
 
 # --- КОНФИГУРАЦИЯ НА СТРАНИЦАТА ---
-st.set_page_config(page_title="Фитнес и калистеники", page_icon="💪", layout="wide")
+st.set_page_config(page_title="Aylakci", page_icon="🧏‍♂️🫵", layout="wide")
 
 # --- МОТИВАЦИОННИ ЦИТАТИ ---
 quotes = [
@@ -27,6 +27,7 @@ weight = st.sidebar.number_input("Тегло (кг)", min_value=40, max_value=20
 height = st.sidebar.number_input("Ръст (см)", min_value=120, max_value=220, value=180)
 goal = st.sidebar.selectbox("Цел", ["Отслабване", "Поддържане", "Мускулна маса"])
 workout_type = st.sidebar.selectbox("Тип тренировка", ["Калистеника", "Фитнес зала", "Кардио"])
+
 
 # --- ОСНОВНИ РАЗДЕЛИ ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -59,10 +60,10 @@ with tab1:
 with tab2:
     st.header(f"📅 План: {workout_type}")
     if workout_type == "Калистеника":
-        st.write("- **Понеделник:** Набирания и лицеви опори (5 серии)")
-        st.write("- **Вторник:** Клекове и напади (4 серии)")
-        st.write("- **Сряда:** Почивка или коремни преси")
-        st.write("- **Четвъртък:** Кофички и L-sit (4 серии)")
+        st.write("- **Понеделник:** Лицеви опори и кофички (5 серии по 20)")
+        st.write("- **Вторник:** Клекове и напади (4 серии по 20)")
+        st.write("- **Сряда:** Набирения (5 серии по 20)")
+        st.write("- **Четвъртък:** Коремни преси (4 серии по макс)")
     else:
         st.write("Генериране на план за фитнес зала...")
         st.table({"Упражнение": ["Лежанка", "Мъртва тяга", "Клек"], "Серии": [4, 3, 4], "Повторения": ["8-10", "5", "10"]})
