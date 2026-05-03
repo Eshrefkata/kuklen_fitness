@@ -1,160 +1,119 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import datetime
 import random
-import os
+from PIL import Image
+import datetime
 
-# --- CONFIG ---
-st.set_page_config(page_title="Fitness Pro 90", page_icon="💪", layout="wide")
+# --- КОНФИГУРАЦИЯ НА СТРАНИЦАТА ---
+st.set_page_config(page_title="Фитнес и калистеники", page_icon="💪", layout="wide")
 
-# Custom CSS за модерен вид
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stMetric { background-color: #1e2130; padding: 15px; border-radius: 15px; border: 1px solid #3e4250; }
-    .exercise-card { 
-        background-color: #262730; 
-        padding: 20px; 
-        border-radius: 10px; 
-        border-left: 5px solid #FF4B4B;
-        margin-bottom: 20px;
-    }
-    .quote-box {
-        font-style: italic;
-        color: #9EA0A5;
-        text-align: center;
-        padding: 10px;
-        border-bottom: 1px solid #3e4250;
-        margin-bottom: 30px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# --- МОТИВАЦИОННИ ЦИТАТИ ---
+quotes = [
+    "“Ти не спираш, когато си уморен. Спираш, когато си готов!” – Дейвид Гогинс",
+    "“Всичко е в главата. Ако не вярваш, че можеш, вече си загубил.” – Макс Верстапен",
+    "“Бъди по-неудобен за себе си всеки ден.” – Дейвид Гогинс",
+    "“Второто място е просто първото сред губещите.” – Макс Верстапен",
+    "“Stay Hard!” – Дейвид Гогинс"
+]
 
-# --- DATA ENGINE ---
-DB_FILE = "fitness_data_v2.csv"
-
-def load_data():
-    if os.path.exists(DB_FILE):
-        df = pd.read_csv(DB_FILE)
-        df['Date'] = pd.to_datetime(df['Date']).dt.date
-        return df
-    return pd.DataFrame(columns=["Date", "Weight", "Workout", "Cals", "Done"])
-
-def get_streak(df):
-    if df.empty: return 0
-    dates = sorted(df[df['Done'] == True]['Date'].unique(), reverse=True)
-    if not dates or dates[0] < datetime.date.today() - datetime.timedelta(days=1): return 0
-    streak = 0
-    curr = dates[0]
-    for d in dates:
-        if d == curr or d == curr - datetime.timedelta(days=1):
-            streak += 1
-            curr = d
-        else: break
-    return streak
-
-# --- UI HEADER ---
-st.title("🏆 Fitness Pro 90")
-quotes = ["„Единствената лоша тренировка е тази, която не се е състояла.“", 
-          "„Успехът е сумата от малки усилия, повтаряни ден след ден.“"]
-st.markdown(f"<div class='quote-box'>{random.choice(quotes)}</div>", unsafe_allow_html=True)
-
-if 'db' not in st.session_state:
-    st.session_state.db = load_data()
-
-# --- DUOLINGO STYLE METRICS ---
-m1, m2, m3, m4 = st.columns(4)
-current_streak = get_streak(st.session_state.db)
-m1.metric("🔥 STREAK", f"{current_streak} ДНИ")
-m2.metric("📅 ПРОГРЕС", f"{len(st.session_state.db)}/90 Дни")
-m3.metric("⚖️ ТЕГЛО", f"{st.session_state.db['Weight'].iloc[-1] if not st.session_state.db.empty else '--'} кг")
-m4.metric("⚡ НИВО", "Калистеника")
-
+# --- ЗАГЛАВИЕ И ЦИТАТ ---
+st.title("💪 Фитнес и калистеники")
+st.subheader(random.choice(quotes))
 st.divider()
 
-# --- MAIN NAVIGATION ---
-tabs = st.tabs(["🚀 Днешна Тренировка", "📊 Анализи", "📂 База Данни", "⚙️ Настройки"])
+# --- СТРАНИЧНА ЛЕНТА (SIDEBAR) - НАСТРОЙКИ ---
+st.sidebar.header("⚙️ Лични настройки")
+gender = st.sidebar.radio("Пол", ["Мъж", "Жена"])
+weight = st.sidebar.number_input("Тегло (кг)", min_value=40, max_value=200, value=80)
+height = st.sidebar.number_input("Ръст (см)", min_value=120, max_value=220, value=180)
+goal = st.sidebar.selectbox("Цел", ["Отслабване", "Поддържане", "Мускулна маса"])
+workout_type = st.sidebar.selectbox("Тип тренировка", ["Калистеника", "Фитнес зала", "Кардио"])
 
-# --- TAB 1: AI PLAN & VIDEOS ---
-with tabs[0]:
-    st.header("🤖 Твоят AI План за Днес")
-    lvl = st.select_slider("Ниво на трудност:", options=["Начинаещ", "Напреднал"])
+# --- ОСНОВНИ РАЗДЕЛИ ---
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🥗 Диета", 
+    "🏋️ Тренировка", 
+    "📸 Калориен скенер", 
+    "📈 Прогрес", 
+    "🤖 Чат с Гогинс"
+])
+
+# --- РАЗДЕЛ 1: ПЛАН ЗА ДИЕТА ---
+with tab1:
+    st.header("🍎 Твоят хранителен план")
+    # Базова формула за BMR (Mifflin-St Jeor)
+    bmr = 10 * weight + 6.25 * height - 5 * 25 # Приемаме средна възраст 25
+    if gender == "Мъж": bmr += 5
+    else: bmr -= 161
     
-    # Структурирана библиотека с упражнения
-    workouts = {
-        "Начинаещ": [
-            {"name": "Лицеви опори (Push-ups)", "reps": "3 серии x 10", "vid": "https://www.youtube.com/watch?v=iodWzQL7Zno"},
-            {"name": "Клякания (Squats)", "reps": "3 серии x 15", "vid": "https://www.youtube.com/watch?v=mGvzVjuY8SY"},
-            {"name": "Планк (Plank)", "reps": "3 серии x 30 сек", "vid": "https://www.youtube.com/watch?v=ASdvN_XEl_c"}
-        ],
-        "Напреднал": [
-            {"name": "Набирания (Pull-ups)", "reps": "4 серии x 8", "vid": "https://www.youtube.com/watch?v=eGo4IYlbE5g"},
-            {"name": "Диамантени опори", "reps": "3 серии x 12", "vid": "https://www.youtube.com/watch?v=6dZHZ0_RPhw"},
-            {"name": "L-sit Hold", "reps": "3 серии x 15 сек", "vid": "https://www.youtube.com/watch?v=IuZGoU6KSt4"}
-        ]
-    }
-
-    # Показване на упражненията в карти с видео
-    for ex in workouts[lvl]:
-        with st.container():
-            col_info, col_vid = st.columns([1, 1.5])
-            with col_info:
-                st.markdown(f"""<div class='exercise-card'>
-                    <h3>{ex['name']}</h3>
-                    <p><b>Цел:</b> {ex['reps']}</p>
-                </div>""", unsafe_allow_html=True)
-                st.write("Прочети инструкциите под видеото за правилна форма.")
-            with col_vid:
-                st.video(ex['vid'])
-            st.divider()
-
-# --- TAB 2: LOGGING & PROGRESS ---
-with tabs[1]:
-    col_log, col_chart = st.columns([1, 2])
+    st.metric("Дневен калориен прием (Base)", f"{int(bmr)} kcal")
     
-    with col_log:
-        st.subheader("📝 Лог на деня")
-        with st.form("log_form", clear_on_submit=True):
-            w_val = st.number_input("Тегло днес", 40.0, 150.0, step=0.1)
-            type_val = st.selectbox("Активност", ["Калистеника", "Кардио", "Почивка"])
-            cal_val = st.number_input("Калории", 0, 1000, 250)
-            is_done = st.checkbox("Завършена тренировка", value=True)
-            if st.form_submit_button("Запиши"):
-                new_row = pd.DataFrame([{"Date": datetime.date.today(), "Weight": w_val, "Workout": type_val, "Cals": cal_val, "Done": is_done}])
-                st.session_state.db = pd.concat([st.session_state.db, new_row], ignore_index=True)
-                st.session_state.db.to_csv(DB_FILE, index=False)
-                st.balloons()
-                st.rerun()
+    col1, col2, col3 = st.columns(3)
+    col1.write("**Протеини**")
+    col1.info(f"{weight * 2}г")
+    col2.write("**Въглехидрати**")
+    col2.info(f"{weight * 3}г")
+    col3.write("**Мазнини**")
+    col3.info(f"{weight * 0.8:.1f}г")
 
-    with col_chart:
-        st.subheader("📈 Графика на теглото")
-        if not st.session_state.db.empty:
-            fig = px.area(st.session_state.db, x="Date", y="Weight", color_discrete_sequence=['#FF4B4B'])
-            st.plotly_chart(fig, use_container_width=True)
+# --- РАЗДЕЛ 2: ТРЕНИРОВЪЧЕН ПЛАН ---
+with tab2:
+    st.header(f"📅 План: {workout_type}")
+    if workout_type == "Калистеника":
+        st.write("- **Понеделник:** Набирания и лицеви опори (5 серии)")
+        st.write("- **Вторник:** Клекове и напади (4 серии)")
+        st.write("- **Сряда:** Почивка или коремни преси")
+        st.write("- **Четвъртък:** Кофички и L-sit (4 серии)")
+    else:
+        st.write("Генериране на план за фитнес зала...")
+        st.table({"Упражнение": ["Лежанка", "Мъртва тяга", "Клек"], "Серии": [4, 3, 4], "Повторения": ["8-10", "5", "10"]})
 
-# --- TAB 3: DATA VIEW ---
-with tabs[2]:
-    st.subheader("📁 История на всички записи")
-    st.dataframe(st.session_state.db.sort_values("Date", ascending=False), use_container_width=True)
+# --- РАЗДЕЛ 3: КАЛОРИЕН СКЕНЕР ---
+with tab3:
+    st.header("📸 Снимай храната си")
+    img_file = st.camera_input("Направи снимка на продукта")
+    if img_file:
+        st.image(img_file)
+        st.warning("⚠️ Интегрирайте Vision API (Gemini/OpenAI), за да анализирате реално калориите.")
+        st.info("Прогноза (демо): ~250 kcal (Ябълка/Снак)")
+
+# --- РАЗДЕЛ 4: СРАВНЕНИЕ НА ПРОГРЕСА ---
+with tab4:
+    st.header("📈 Преди и Сега")
+    col_left, col_right = st.columns(2)
     
-    # Heatmap visualization
-    st.subheader("🔥 Календар на активността")
-    if not st.session_state.db.empty:
-        # Simple dot-map of activity
-        days = ["Пон", "Вт", "Ср", "Чет", "Пет", "Съб", "Нед"]
-        activity_data = [1 if i < len(st.session_state.db) else 0 for i in range(90)]
-        # Тук може да се добави по-сложен Heatmap, ако има дати за всички 90 дни
+    with col_left:
+        file_before = st.file_uploader("Снимка Преди", type=['jpg', 'png'])
+        if file_before: st.image(file_before, caption="Преди")
+        
+    with col_right:
+        file_after = st.file_uploader("Снимка Сега", type=['jpg', 'png'])
+        if file_after: st.image(file_after, caption="Сега")
 
-# --- TAB 4: SETTINGS ---
-with tabs[3]:
-    st.header("⚙️ Управление на профила")
-    if st.button("🚨 ИЗТРИЙ ЦЕЛИЯ ПРОГРЕС", help="Внимавай! Това ще изтрие CSV файла."):
-        if os.path.exists(DB_FILE):
-            os.remove(DB_FILE)
-            st.session_state.db = load_data()
-            st.rerun()
+# --- РАЗДЕЛ 5: ВИРТУАЛЕН АСИСТЕНТ (ГОГИНС) ---
+with tab5:
+    st.header("🤖 Дейвид Гогинс Асистент")
+    st.write("*„Не ме интересува дали си уморен. Ставай!“*")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-# --- DISCLAIMER ---
-st.caption("⚠️ Консултирайте се с лекар преди започване на интензивна тренировъчна програма.")
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Кажи нещо на Гогинс..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            # Симулиран отговор в стил Гогинс
+            responses = [
+                f"Защо се оплакваш? {prompt} не е извинение! STAY HARD!",
+                "Ти си в комфортната си зона. Излез от там!",
+                "Кой ще пренесе лодките?! ТИ ЛИ?!",
+                "Болката е най-добрият учител. Не спирай!"
+            ]
+            response = random.choice(responses)
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
